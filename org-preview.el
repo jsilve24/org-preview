@@ -199,50 +199,51 @@ Some of the options can be changed using the variable
 
           (setq num-overlays (length math-locations))
           
-          (pcase-let ((`(,texfilebase ,tex-process ,image-process)
-                       (org-preview-create-formula-image
-                        (mapconcat #'identity (nreverse math-text) "\n\n")
-                        options forbuffer processing-type start-time)))
-            (set-process-sentinel
-             image-process
-             (lambda (proc signal)
-               (when org-preview--debug-msg
-                 (unless (process-live-p proc)
-                   (org-preview-report "DVI processing" start-time)))
-               (when (string= signal "finished\n")
-                 (let ((images (file-expand-wildcards
-                                (concat texfilebase "*." image-output-type)
-                                'full)))
-                   (cl-loop with loc = (point)
-                            for hash in (nreverse math-hashes)
-                            for (block-beg . block-end) in (nreverse math-locations)
-                            for image-file in images
-                            for movefile = (format "%s_%s.%s" absprefix hash image-output-type)
-                            do (copy-file image-file movefile 'replace)
-                            do (if overlays
-		                   (progn
-		                     (dolist (o (overlays-in block-beg block-end))
-		                       (when (eq (overlay-get o 'org-overlay-type)
-		        	                 'org-latex-overlay)
-		                         (delete-overlay o)))
-		                     (org--make-preview-overlay block-beg block-end movefile image-output-type)
-		                     (goto-char block-end))
-		                 (delete-region block-beg block-end)
-		                 (insert
-		                  (org-add-props link
-		                      (list 'org-latex-src
-		        	            (replace-regexp-in-string "\"" "" value)
-		        	            'org-latex-src-embed-type
-		        	            (if block-type 'paragraph 'character)))))
-                            finally do (goto-char loc))))
-               (unless (process-live-p proc)
-                 (mapc #'delete-file (file-expand-wildcards (concat texfilebase "*." image-output-type) 'full))
-                 (delete-file (concat texfilebase "." image-input-type)))
-               (when org-preview--debug-msg
-                 (org-preview-report "Overlay placement" start-time)
-                 (with-current-buffer org-preview--log-buf
-                   (insert (format "Previews: %d, Process: %S\n\n"
-                                   num-overlays processing-type)))))))))
+	  (unless (not math-text)
+            (pcase-let ((`(,texfilebase ,tex-process ,image-process)
+			 (org-preview-create-formula-image
+                          (mapconcat #'identity (nreverse math-text) "\n\n")
+                          options forbuffer processing-type start-time)))
+              (set-process-sentinel
+               image-process
+               (lambda (proc signal)
+		 (when org-preview--debug-msg
+                   (unless (process-live-p proc)
+                     (org-preview-report "DVI processing" start-time)))
+		 (when (string= signal "finished\n")
+                   (let ((images (file-expand-wildcards
+                                  (concat texfilebase "*." image-output-type)
+                                  'full)))
+                     (cl-loop with loc = (point)
+                              for hash in (nreverse math-hashes)
+                              for (block-beg . block-end) in (nreverse math-locations)
+                              for image-file in images
+                              for movefile = (format "%s_%s.%s" absprefix hash image-output-type)
+                              do (copy-file image-file movefile 'replace)
+                              do (if overlays
+		                     (progn
+		                       (dolist (o (overlays-in block-beg block-end))
+					 (when (eq (overlay-get o 'org-overlay-type)
+		        	                   'org-latex-overlay)
+		                           (delete-overlay o)))
+		                       (org--make-preview-overlay block-beg block-end movefile image-output-type)
+		                       (goto-char block-end))
+		                   (delete-region block-beg block-end)
+		                   (insert
+		                    (org-add-props link
+					(list 'org-latex-src
+		        	              (replace-regexp-in-string "\"" "" value)
+		        	              'org-latex-src-embed-type
+		        	              (if block-type 'paragraph 'character)))))
+                              finally do (goto-char loc))))
+		 (unless (process-live-p proc)
+                   (mapc #'delete-file (file-expand-wildcards (concat texfilebase "*." image-output-type) 'full))
+                   (delete-file (concat texfilebase "." image-input-type)))
+		 (when org-preview--debug-msg
+                   (org-preview-report "Overlay placement" start-time)
+                   (with-current-buffer org-preview--log-buf
+                     (insert (format "Previews: %d, Process: %S\n\n"
+                                     num-overlays processing-type))))))))))
        (t
 	(error "Unknown conversion process %s for LaTeX fragments"
 	       processing-type))))))
